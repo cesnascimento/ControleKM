@@ -1,18 +1,34 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import json
 from io import StringIO
 
 # Função para carregar e limpar os dados
-@st.cache_data  # Usando st.cache_data em vez de st.cache, conforme as novas práticas recomendadas
+@st.cache_data  # Usando st.cache para manter os dados em cache
 def load_data():
-    df = pd.read_csv('testekm.csv')
-    df['Criado'] = pd.to_datetime(df['Criado'], format='%d/%m/%Y %H:%M')
-    df['Modificado'] = pd.to_datetime(df['Modificado'], format='%d/%m/%Y %H:%M')
-    df['Data'] = pd.to_datetime(df['Data'], format='%d/%m/%Y')
-    df['KMFinal'] = df['KMFinal'].str.replace(',', '.').astype(float)
-    df['KMInicial'] = df['KMInicial'].str.replace(',', '.').astype(float)
-    df['KMTotal'] = df['KMTotal'].str.replace(',', '.').astype(float)
+    #path = '\\\\dmsrv-nfs/Dermage/8.T.I/Controle_Km/controlekm.csv'
+    path = '/home/cnascimento/controlekm/controlekm.csv'
+    df = pd.read_csv(path)
+    
+    # Convertendo a coluna "Criado por" para pegar o 'DisplayName' do JSON
+    def extract_display_name(s):
+        try:
+            data = json.loads(s.replace("'", "\""))
+            return data['DisplayName']
+        except:
+            return s
+
+    df['Criado por'] = df['Criado por'].apply(extract_display_name)
+    df['Criado'] = pd.to_datetime(df['Criado'])
+    df['Modificado'] = pd.to_datetime(df['Modificado'])
+    df['Data'] = pd.to_datetime(df['Data'])
+    
+    # Tratar colunas KM apenas se forem strings
+    for column in ['KMFinal', 'KMInicial', 'KMTotal']:
+        if df[column].dtype == "object":
+            df[column] = df[column].str.replace(',', '.').astype(float)
+    
     return df
 
 # Carregar dados
@@ -46,7 +62,7 @@ if not filtered_df.empty:
         user_totals = filtered_df.groupby('Criado por')['KMTotal'].sum()
         
         fig = px.bar(user_totals.reset_index(), x='Criado por', y='KMTotal', title=f"{title} - Totais Individuais de Quilometragem",
-                     labels={'KMTotal': 'Quilometragem Total', 'Criado por': 'Usuário'})
+                        labels={'KMTotal': 'Quilometragem Total', 'Criado por': 'Usuário'})
         
         st.plotly_chart(fig)
         
@@ -58,17 +74,16 @@ if not filtered_df.empty:
         for user, total in user_totals.items():
             st.write(f"{user}: {total:.2f}")
         
-        
     else:
         user_df = filtered_df[filtered_df['Criado por'] == selected_user]
         fig = px.bar(user_df, x='Data', y='KMTotal', title=f"{title} para {selected_user} - Quilometragem Diária",
-                     labels={'KMTotal': 'Quilometragem Total', 'Data': 'Data'})
+                        labels={'KMTotal': 'Quilometragem Total', 'Data': 'Data'})
         
         total_user = user_df['KMTotal'].sum()
         st.write(f"Total percorrido por {selected_user}: {total_user:.2f}")
     
         st.plotly_chart(fig)
-    
+
     # Adicionando opção para exportar dados para CSV
     csv_buffer = StringIO()
     filtered_df.to_csv(csv_buffer, index=False)
