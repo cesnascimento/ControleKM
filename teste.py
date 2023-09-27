@@ -5,29 +5,21 @@ import json
 from io import StringIO
 
 # Função para carregar e limpar os dados
-@st.cache_data  # Usando st.cache para manter os dados em cache
+@st.cache_data
 def load_data():
-    #path = '\\\\dmsrv-nfs/Dermage/8.T.I/Controle_Km/controlekm.csv'
-    path = '/home/cnascimento/controlekm/controlekm.csv'
+    path = '\\\\dmsrv-nfs/Dermage/8.T.I/Controle_Km/controlekm.csv'
     df = pd.read_csv(path)
     
     # Convertendo a coluna "Criado por" para pegar o 'DisplayName' do JSON
     def extract_display_name(s):
         try:
-            data = json.loads(s.replace("'", "\""))
+            data = json.loads(s.replace("'", '"'))
             return data['DisplayName']
         except:
             return s
 
     df['Criado por'] = df['Criado por'].apply(extract_display_name)
-    df['Criado'] = pd.to_datetime(df['Criado'])
-    df['Modificado'] = pd.to_datetime(df['Modificado'])
-    df['Data'] = pd.to_datetime(df['Data'])
-    
-    # Tratar colunas KM apenas se forem strings
-    for column in ['KMFinal', 'KMInicial', 'KMTotal']:
-        if df[column].dtype == "object":
-            df[column] = df[column].str.replace(',', '.').astype(float)
+    df['Data de Criação'] = pd.to_datetime(df['Data de Criação'])
     
     return df
 
@@ -35,58 +27,54 @@ def load_data():
 df = load_data()
 
 # Título
-st.title('Dashboard de Quilometragem')
+st.title('Painel de Quilometragem')
 
 # Seleção de usuário
-user_list = ['Todos'] + df['Criado por'].unique().tolist()
-selected_user = st.selectbox('Escolha um usuário:', user_list)
+lista_usuarios = ['Todos'] + df['Criado por'].unique().tolist()
+usuario_selecionado = st.selectbox('Escolha um usuário:', lista_usuarios)
 
 # Seleção de intervalo de datas
-start_date, end_date = st.date_input('Escolha um intervalo de datas:', [df['Data'].min().date(), df['Data'].max().date()])
+data_inicial, data_final = st.date_input('Escolha um intervalo de datas:', [df['Data de Criação'].min().date(), df['Data de Criação'].max().date()])
 
 # Convertendo objetos date para Timestamp para comparação
-start_date = pd.Timestamp(start_date)
-end_date = pd.Timestamp(end_date)
+data_inicial = pd.Timestamp(data_inicial)
+data_final = pd.Timestamp(data_final)
 
 # Filtrar dados
-filtered_df = df[(df['Data'] >= start_date) & (df['Data'] <= end_date)]
+df_filtrado = df[(df['Data de Criação'] >= data_inicial) & (df['Data de Criação'] <= data_final)]
 
-if selected_user != 'Todos':
-    filtered_df = filtered_df[filtered_df['Criado por'] == selected_user]
+if usuario_selecionado != 'Todos':
+    df_filtrado = df_filtrado[df_filtrado['Criado por'] == usuario_selecionado]
 
 # Gráficos
-if not filtered_df.empty:
-    title = f'Total de Quilometragem entre {start_date.date()} e {end_date.date()}'
+if not df_filtrado.empty:
+    titulo = f'Total de Quilometragem entre {data_inicial.date()} e {data_final.date()}'
     
-    if selected_user == 'Todos':
-        user_totals = filtered_df.groupby('Criado por')['KMTotal'].sum()
-        
-        fig = px.bar(user_totals.reset_index(), x='Criado por', y='KMTotal', title=f"{title} - Totais Individuais de Quilometragem",
-                        labels={'KMTotal': 'Quilometragem Total', 'Criado por': 'Usuário'})
-        
+    if usuario_selecionado == 'Todos':
+        totais_usuarios = df_filtrado.groupby('Criado por')['Km Total'].sum()
+        fig = px.bar(totais_usuarios.reset_index(), x='Criado por', y='Km Total', title=f"{titulo} - Totais Individuais de Quilometragem",
+                     labels={'Km Total': 'Quilometragem Total', 'Criado por': 'Usuário'})
         st.plotly_chart(fig)
         
         st.subheader("Totais de Todos os Usuários:")
-        total_todos_usuarios = user_totals.sum()
+        total_todos_usuarios = totais_usuarios.sum()
         st.write(f"Total de Quilometragem de Todos os Usuários: {total_todos_usuarios:.2f}")
-        
+
         st.subheader("Totais Individuais de Quilometragem:")
-        for user, total in user_totals.items():
+        for user, total in totais_usuarios.items():
             st.write(f"{user}: {total:.2f}")
         
     else:
-        user_df = filtered_df[filtered_df['Criado por'] == selected_user]
-        fig = px.bar(user_df, x='Data', y='KMTotal', title=f"{title} para {selected_user} - Quilometragem Diária",
-                        labels={'KMTotal': 'Quilometragem Total', 'Data': 'Data'})
-        
-        total_user = user_df['KMTotal'].sum()
-        st.write(f"Total percorrido por {selected_user}: {total_user:.2f}")
-    
+        user_df = df_filtrado[df_filtrado['Criado por'] == usuario_selecionado]
+        fig = px.bar(user_df, x='Data de Criação', y='Km Total', title=f"{titulo} para {usuario_selecionado} - Quilometragem Diária",
+                     labels={'Km Total': 'Quilometragem Total', 'Data de Criação': 'Data'})
         st.plotly_chart(fig)
+        total_usuario = user_df['Km Total'].sum()
+        st.write(f"Total percorrido por {usuario_selecionado}: {total_usuario:.2f}")
 
     # Adicionando opção para exportar dados para CSV
     csv_buffer = StringIO()
-    filtered_df.to_csv(csv_buffer, index=False)
+    df_filtrado.to_csv(csv_buffer, index=False)
     csv_str = csv_buffer.getvalue()
     st.download_button(
         label="Baixar dados como CSV",
