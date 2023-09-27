@@ -7,7 +7,8 @@ from io import StringIO
 # Função para carregar e limpar os dados
 @st.cache_data
 def load_data():
-    path = '\\\\dmsrv-nfs/Dermage/8.T.I/Controle_Km/controlekm.csv'
+    #path = '\\\\dmsrv-nfs/Dermage/8.T.I/Controle_Km/controlekm.csv'
+    path = '/home/cnascimento/controlekm/controlekm.csv'
     df = pd.read_csv(path)
     
     # Convertendo a coluna "Criado por" para pegar o 'DisplayName' do JSON
