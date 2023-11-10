@@ -9,11 +9,11 @@ from io import StringIO
 
 @st.cache_data
 def load_data():
-    # path = '\\\\dmsrv-nfs/Dermage/8.T.I/Controle_Km/controlekm.csv'
-    path = '/home/cnascimento/controlekm/controlekm.csv'
+    # Caminho atualizado para o novo arquivo CSV
+    path = 'sharepoint_data.csv'
     df = pd.read_csv(path)
 
-    # Convertendo a coluna "Criado por" para pegar o 'DisplayName' do JSON
+    # Remova ou ajuste esta seção se a coluna 'Criado por' em seu novo CSV não estiver em formato JSON
     def extract_display_name(s):
         try:
             data = json.loads(s.replace("'", '"'))
@@ -22,7 +22,9 @@ def load_data():
             return s
 
     df['Criado por'] = df['Criado por'].apply(extract_display_name)
-    df['Data de Criação'] = pd.to_datetime(df['Data de Criação'])
+
+    # Certifique-se de que as colunas no CSV correspondem a estas
+    df['Data'] = pd.to_datetime(df['Data'])
 
     return df
 
@@ -39,15 +41,15 @@ usuario_selecionado = st.selectbox('Escolha um usuário:', lista_usuarios)
 
 # Seleção de intervalo de datas
 data_inicial, data_final = st.date_input('Escolha um intervalo de datas:', [
-                                         df['Data de Criação'].min().date(), df['Data de Criação'].max().date()])
+                                         df['Data'].min().date(), df['Data'].max().date()])
 
 # Convertendo objetos date para Timestamp para comparação
 data_inicial = pd.Timestamp(data_inicial)
 data_final = pd.Timestamp(data_final)
 
 # Filtrar dados
-df_filtrado = df[(df['Data de Criação'] >= data_inicial)
-                 & (df['Data de Criação'] <= data_final)]
+df_filtrado = df[(df['Data'] >= data_inicial)
+                 & (df['Data'] <= data_final)]
 
 if usuario_selecionado != 'Todos':
     df_filtrado = df_filtrado[df_filtrado['Criado por'] == usuario_selecionado]
@@ -57,9 +59,9 @@ if not df_filtrado.empty:
     titulo = f'Total de Quilometragem entre {data_inicial.date()} e {data_final.date()}'
 
     if usuario_selecionado == 'Todos':
-        totais_usuarios = df_filtrado.groupby('Criado por')['Km Total'].sum()
-        fig = px.bar(totais_usuarios.reset_index(), x='Criado por', y='Km Total', text='Km Total', title=f"{titulo} - Totais Individuais de Quilometragem",
-                     labels={'Km Total': 'Quilometragem Total', 'Criado por': 'Usuário'})
+        totais_usuarios = df_filtrado.groupby('Criado por')['KMTotal'].sum()
+        fig = px.bar(totais_usuarios.reset_index(), x='Criado por', y='KMTotal', text='KMTotal', title=f"{titulo} - Totais Individuais de Quilometragem",
+                     labels={'KMTotal': 'Quilometragem Total', 'Criado por': 'Usuário'})
         st.plotly_chart(fig)
 
         st.subheader("Totais de Todos os Usuários:")
@@ -73,10 +75,10 @@ if not df_filtrado.empty:
 
     else:
         user_df = df_filtrado[df_filtrado['Criado por'] == usuario_selecionado]
-        fig = px.bar(user_df, x='Data de Criação', y='Km Total', text='Km Total', title=f"{titulo} para {usuario_selecionado} - Quilometragem Diária",
-                     labels={'Km Total': 'Quilometragem Total', 'Data de Criação': 'Data'})
+        fig = px.bar(user_df, x='Data', y='KMTotal', text='KMTotal', title=f"{titulo} para {usuario_selecionado} - Quilometragem Diária",
+                     labels={'KMTotal': 'Quilometragem Total', 'Data': 'Data'})
         st.plotly_chart(fig)
-        total_usuario = user_df['Km Total'].sum()
+        total_usuario = user_df['KMTotal'].sum()
         st.write(
             f"Total percorrido por {usuario_selecionado}: {total_usuario:.2f}")
 
